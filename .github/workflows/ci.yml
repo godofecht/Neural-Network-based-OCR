@@ -21,11 +21,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libx11-dev git
 
-      - name: Checkout tinyML (headers only)
+      - name: Build tinyML dependency
         run: |
           cd /tmp
           git clone --depth=1 https://github.com/godofecht/tinyML.git
-          echo "tinyML headers available at /tmp/tinyML/include"
+          cd tinyML
+          # Fix clock type mismatch bug in TinyMLUtils.cpp
+          sed -i 's/metrics_.last_updated = end_time/metrics_.last_updated = std::chrono::steady_clock::now()/' src/TinyMLUtils.cpp
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . -j$(nproc)
 
       - name: Configure OCR with CMake
         run: |
@@ -34,7 +39,7 @@ jobs:
           cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/tmp/tinyML
+            -DCMAKE_PREFIX_PATH=/tmp/tinyML/build
           echo "CMake configuration complete"
 
       - name: Build OCR

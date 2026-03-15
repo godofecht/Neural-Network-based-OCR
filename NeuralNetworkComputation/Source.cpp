@@ -7,7 +7,6 @@
 
 // tinyML includes
 #include "Network.h"
-#include "NN.h"
 
 // CImg for image processing
 #include "CImg.h"
@@ -41,6 +40,9 @@ struct Computer {
     Computer(const Computer& other)
         : net(make_unique<Network>(*other.net)), fitness(other.fitness) {}
     
+    Computer(Computer&& other) = default;
+    Computer& operator=(Computer&& other) = default;
+
     Computer& operator=(const Computer& other) {
         if (this != &other) {
             net = make_unique<Network>(*other.net);

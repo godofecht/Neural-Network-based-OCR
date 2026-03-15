@@ -29,8 +29,8 @@ jobs:
           # Fix clock type mismatch bug in TinyMLUtils.cpp
           sed -i 's/metrics_.last_updated = end_time/metrics_.last_updated = std::chrono::steady_clock::now()/' src/TinyMLUtils.cpp
           mkdir -p build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
-          cmake --build . -j$(nproc)
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build . --target TinyML -j$(nproc)
 
       - name: Configure OCR with CMake
         run: |

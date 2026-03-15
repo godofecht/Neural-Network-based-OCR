@@ -21,15 +21,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libx11-dev git
 
-      - name: Checkout and build tinyML
+      - name: Checkout tinyML (headers only)
         run: |
           cd /tmp
           git clone --depth=1 https://github.com/godofecht/tinyML.git
-          cd tinyML
-          mkdir -p build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
-          cmake --build . -j$(nproc) --verbose
-          echo "tinyML built successfully"
+          echo "tinyML headers available at /tmp/tinyML/include"
 
       - name: Configure OCR with CMake
         run: |
@@ -38,7 +34,7 @@ jobs:
           cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/tmp/tinyML/build
+            -DCMAKE_PREFIX_PATH=/tmp/tinyML
           echo "CMake configuration complete"
 
       - name: Build OCR

@@ -46,8 +46,8 @@ class Network
 		void getResults(vector <double> &resultVals);
 		double getRecentAverageError(void) const { return m_recentAverageError; }
 
-		vector<double> Network::GetWeights() const;
-		void Network::PutWeights(vector<double> &weights);
+		vector<double> GetWeights() const;
+		void PutWeights(vector<double> &weights);
 
 	private:
 		vector <Layer> m_layers;

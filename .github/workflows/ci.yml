@@ -11,35 +11,19 @@ env:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-            cc: gcc-10
-            cxx: g++-10
-          - os: macos-latest
-            cc: clang
-            cxx: clang++
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup dependencies (Ubuntu)
-        if: runner.os == 'Linux'
+      - name: Setup dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libx11-dev
 
-      - name: Setup dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install cmake
-
       - name: Cache tinyML build
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.tinyml_cache
           key: tinyml-${{ runner.os }}-${{ hashFiles('**/tinyML.lock') }}
@@ -54,9 +38,8 @@ jobs:
           mkdir -p build
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
-          cmake --build . -j$(nproc || sysctl -n hw.ncpu)
+          cmake --build . -j$(nproc)
           cmake --install . --prefix ~/.tinyml_cache
-        shell: bash
 
       - name: Create build directory
         run: mkdir -p build
@@ -66,17 +49,12 @@ jobs:
           cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$HOME/.tinyml_cache" \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
-            -DCMAKE_C_COMPILER=${{ matrix.cc }}
-        env:
-          CC: ${{ matrix.cc }}
-          CXX: ${{ matrix.cxx }}
+            -DCMAKE_PREFIX_PATH="$HOME/.tinyml_cache"
 
       - name: Build
         run: |
           cd build
-          cmake --build . --config Release -j$(nproc || sysctl -n hw.ncpu)
+          cmake --build . --config Release -j$(nproc)
 
       - name: Test executable exists
         run: |
@@ -94,9 +72,9 @@ jobs:
 
       - name: Upload build artifacts
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: build-logs-${{ matrix.os }}
+          name: build-logs
           path: build/
 
   code-quality:

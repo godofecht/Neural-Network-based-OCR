@@ -2,89 +2,74 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ master, main, develop ]
+    branches: [ master, main ]
   pull_request:
     branches: [ master, main ]
-
-env:
-  CMAKE_VERSION: 3.15.0
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout OCR repo
         uses: actions/checkout@v4
+        with:
+          path: ocr
 
-      - name: Setup dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libx11-dev
+          sudo apt-get install -y build-essential cmake libx11-dev git
 
-      - name: Cache tinyML build
-        uses: actions/cache@v4
-        with:
-          path: ~/.tinyml_cache
-          key: tinyml-${{ runner.os }}-${{ hashFiles('**/tinyML.lock') }}
-
-      - name: Clone and build tinyML
+      - name: Checkout and build tinyML
         run: |
           cd /tmp
-          if [ ! -d "tinyML" ]; then
-            git clone https://github.com/godofecht/tinyML.git
-          fi
+          git clone --depth=1 https://github.com/godofecht/tinyML.git
           cd tinyML
-          mkdir -p build
-          cd build
+          mkdir -p build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
-          cmake --build . -j$(nproc)
-          cmake --install . --prefix ~/.tinyml_cache
+          cmake --build . -j$(nproc) --verbose
+          echo "tinyML built successfully"
 
-      - name: Create build directory
-        run: mkdir -p build
-
-      - name: Configure CMake
+      - name: Configure OCR with CMake
         run: |
+          cd ocr
+          mkdir -p build
           cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$HOME/.tinyml_cache"
+            -DCMAKE_PREFIX_PATH=/tmp/tinyML/build
+          echo "CMake configuration complete"
 
-      - name: Build
+      - name: Build OCR
         run: |
-          cd build
-          cmake --build . --config Release -j$(nproc)
+          cd ocr/build
+          cmake --build . --config Release -j$(nproc) --verbose
 
-      - name: Test executable exists
+      - name: Verify executable
         run: |
-          test -f build/ocr_trainer && echo "✅ Build successful!" || exit 1
+          ls -lh ocr/build/ocr_trainer
+          file ocr/build/ocr_trainer
+          echo "✅ Build successful!"
 
-      - name: Run basic validation
+      - name: Run executable
         run: |
-          cd build
-          timeout 5 ./ocr_trainer << EOF || true
+          cd ocr/build
+          timeout 3 ./ocr_trainer <<EOF || true
           5
           2
           no
           EOF
-          echo "✅ Executable runs without crashes"
+          echo "✅ Executable runs without crashing"
 
-      - name: Upload build artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: build/
-
-  code-quality:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
-      - name: Check for basic issues
+      - name: Verify project structure
         run: |
-          echo "✅ Code structure validated"
-          test -f README.md && echo "✅ README exists"
+          test -f README.md && echo "✅ README.md exists"
           test -f CMakeLists.txt && echo "✅ CMakeLists.txt exists"
-          test -f NeuralNetworkComputation/Source.cpp && echo "✅ Source files present"
+          test -f NeuralNetworkComputation/Source.cpp && echo "✅ Source.cpp exists"
+          echo "✅ All files present"

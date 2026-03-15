@@ -7,7 +7,6 @@
 
 // tinyML includes
 #include "Network.h"
-#include "NN.h"
 
 // CImg for image processing
 #include "CImg.h"
@@ -34,21 +33,23 @@ vector<double> imgToArray(const CImg<unsigned>& image) {
 struct Computer {
     unique_ptr<Network> net;
     double fitness = 0.0;
-    
-    Computer(const vector<unsigned>& topology) 
-        : net(make_unique<Network>(topology)) {}
-    
-    Computer(const Computer& other)
-        : net(make_unique<Network>(*other.net)), fitness(other.fitness) {}
-    
-    Computer& operator=(const Computer& other) {
-        if (this != &other) {
-            net = make_unique<Network>(*other.net);
-            fitness = other.fitness;
-        }
-        return *this;
+    vector<unsigned> topo;
+
+    Computer(const vector<unsigned>& topology)
+        : net(make_unique<Network>(topology)), topo(topology) {}
+
+    Computer(Computer&& other) = default;
+    Computer& operator=(Computer&& other) = default;
+
+    // ML::Network is not copyable (contains unique_ptr), so clone via weights
+    Computer clone() const {
+        Computer c(topo);
+        c.fitness = fitness;
+        auto w = net->getWeights();
+        c.net->putWeights(w);
+        return c;
     }
-    
+
     double getFitness() const { return fitness; }
     void setFitness(double f) { fitness = f; }
 };
@@ -152,24 +153,24 @@ int main() {
                 // Breed new individuals
                 vector<Computer> newPopulation;
                 for (int i = 0; i < eliteSize; ++i) {
-                    newPopulation.push_back(population[i]);
+                    newPopulation.push_back(population[i].clone());
                 }
-                
+
                 // Fill rest with mutated copies
                 while (newPopulation.size() < population.size()) {
-                    Computer child = newPopulation[rand() % eliteSize];
-                    
+                    Computer child = newPopulation[rand() % eliteSize].clone();
+
                     // Mutation: add small random perturbation to weights
                     auto weights = child.net->getWeights();
                     for (auto& w : weights) {
                         w += ((rand() % 100) / 1000.0) - 0.05;
                     }
                     child.net->putWeights(weights);
-                    
-                    newPopulation.push_back(child);
+
+                    newPopulation.push_back(std::move(child));
                 }
-                
-                population = newPopulation;
+
+                population = std::move(newPopulation);
             }
         }
         

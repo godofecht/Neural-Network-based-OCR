@@ -7,61 +7,73 @@ on:
     branches: [ master, main ]
 
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout OCR repo
         uses: actions/checkout@v4
-        with:
-          path: ocr
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libx11-dev git
+          sudo apt-get install -y build-essential cmake libx11-dev
 
-      - name: Build tinyML dependency
+      - name: Configure with CMake
         run: |
-          cd /tmp
-          git clone --depth=1 https://github.com/godofecht/tinyML.git
-          cd tinyML
-          # Fix clock type mismatch bug in TinyMLUtils.cpp
-          sed -i 's/metrics_.last_updated = end_time/metrics_.last_updated = std::chrono::steady_clock::now()/' src/TinyMLUtils.cpp
-          mkdir -p build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
-          cmake --build . --target TinyML -j$(nproc)
-
-      - name: Configure OCR with CMake
-        run: |
-          cd ocr
           mkdir -p build
           cd build
           cmake .. \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/tmp/tinyML/build
-          echo "CMake configuration complete"
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build OCR
         run: |
-          cd ocr/build
-          cmake --build . --config Release -j$(nproc) --verbose
+          cd build
+          cmake --build . --config Release -j$(nproc)
 
       - name: Verify executable
         run: |
-          ls -lh ocr/build/ocr_trainer
-          file ocr/build/ocr_trainer
-          echo "✅ Build successful!"
+          ls -lh build/ocr_trainer
+          file build/ocr_trainer
+          echo "✅ Linux build successful!"
 
-      - name: Run executable
+      - name: Test executable
         run: |
-          cd ocr/build
+          cd build
           timeout 3 ./ocr_trainer <<EOF || true
           5
           2
           no
           EOF
           echo "✅ Executable runs without crashing"
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout OCR repo
+        uses: actions/checkout@v4
+
+      - name: Setup CMake
+        uses: cmake-js/setup-cmake@v3
+        with:
+          cmake-version: '3.25.x'
+
+      - name: Configure with CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build OCR
+        run: |
+          cd build
+          cmake --build . --config Release -j 4
+
+      - name: Verify executable
+        run: |
+          Get-ChildItem build/Release/ocr_trainer.exe
+          Write-Host "✅ Windows build successful!"
 
   lint:
     runs-on: ubuntu-latest
@@ -73,4 +85,12 @@ jobs:
           test -f README.md && echo "✅ README.md exists"
           test -f CMakeLists.txt && echo "✅ CMakeLists.txt exists"
           test -f NeuralNetworkComputation/Source.cpp && echo "✅ Source.cpp exists"
-          echo "✅ All files present"
+          echo "✅ All required files present"
+          
+      - name: Check for Visual Studio files
+        run: |
+          if [ -f "NeuralNetworkComputation.sln" ] || [ -d ".vs" ] || [ -d "x64" ]; then
+            echo "❌ Error: Visual Studio project files found in repository"
+            exit 1
+          fi
+          echo "✅ No Visual Studio files in root directory"

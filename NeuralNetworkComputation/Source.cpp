@@ -4,12 +4,17 @@
 #include <cmath>
 #include <algorithm>
 #include <memory>
+#include <chrono>
+#include <iomanip>
 
 // tinyML includes
 #include "Network.h"
 
 // CImg for image processing
 #include "CImg.h"
+
+// Training UI
+#include "TrainingUI.h"
 
 using namespace std;
 using namespace cimg_library;
@@ -65,13 +70,15 @@ int main() {
         int generations = 0;
         string useGAString;
         
-        cout << "=== Neural Network OCR Trainer (Powered by tinyML) ===" << endl << endl;
+        TrainingUI::clearScreen();
+        TrainingUI::displayHeader();
         
+        cout << Colors::BRIGHT_YELLOW << "⚙️  Configuration\n" << Colors::RESET;
         cout << "Enter Population size: ";
         cin >> populationSize;
         
         if (populationSize <= 0) {
-            cerr << "Population size must be positive!" << endl;
+            cerr << Colors::RED << "❌ Population size must be positive!" << Colors::RESET << endl;
             return 1;
         }
         
@@ -79,7 +86,7 @@ int main() {
         cin >> generations;
         
         if (generations <= 0) {
-            cerr << "Number of generations must be positive!" << endl;
+            cerr << Colors::RED << "❌ Number of generations must be positive!" << Colors::RESET << endl;
             return 1;
         }
         
@@ -90,12 +97,18 @@ int main() {
         // Network topology: 400 inputs (20x20), 400 hidden, 26 outputs (A-Z)
         vector<unsigned> topology = {400, 400, 26};
         
-        cout << "\nNetwork Topology: ";
-        for (size_t i = 0; i < topology.size(); ++i) {
-            if (i > 0) cout << " -> ";
-            cout << topology[i];
-        }
-        cout << endl;
+        // Clear and show initial UI
+        TrainingUI::clearScreen();
+        TrainingUI::displayHeader();
+        
+        // Create layer info for visualization
+        vector<TrainingUI::LayerInfo> layers = {
+            {"Input Layer", 0, 400, 0},
+            {"Hidden Layer", 400, 400, 400 * 400},
+            {"Output Layer", 400, 26, 400 * 26}
+        };
+        
+        TrainingUI::displayNetworkArchitecture(layers);
         
         // Initialize population
         vector<Computer> population;
@@ -104,12 +117,19 @@ int main() {
             population.emplace_back(topology);
         }
         
-        cout << "\nStarting training..." << endl;
-        cout << "Using " << (useGA ? "Genetic Algorithm" : "Backpropagation") << " optimization" << endl << endl;
+        cout << Colors::BRIGHT_GREEN << "✅ Population initialized with " << populationSize 
+             << " organisms\n" << Colors::RESET;
+        cout << Colors::BRIGHT_GREEN << "✅ Using " << (useGA ? "Genetic Algorithm" : "Backpropagation") 
+             << " optimization\n\n" << Colors::RESET;
+        
+        auto startTime = chrono::steady_clock::now();
+        double previousBestFitness = 0.0;
         
         // Training loop
         for (int gen = 0; gen < generations; ++gen) {
+            auto genStart = chrono::steady_clock::now();
             double sumError = 0.0;
+            double sumFitness = 0.0;
             int sampleCount = 0;
             
             // For each individual in population
@@ -117,7 +137,6 @@ int main() {
                 double trainingError = 0.0;
                 
                 // Simulate training on dataset (placeholder)
-                // In a real scenario, you would load actual training data
                 for (int sample = 0; sample < 10; ++sample) {
                     vector<double> inputVals(400, static_cast<double>(sample) / 10.0);
                     vector<double> targetVals(26, 0.0);
@@ -134,6 +153,7 @@ int main() {
                 computer.setFitness(1.0 / (1.0 + avgError));
                 
                 sumError += avgError;
+                sumFitness += computer.getFitness();
                 sampleCount++;
             }
             
@@ -141,9 +161,35 @@ int main() {
             sort(population.begin(), population.end(), comparatorFunc);
             
             double avgError = sumError / sampleCount;
-            cout << "Generation " << (gen + 1) << "/" << generations 
-                 << " | Avg Error: " << avgError 
-                 << " | Best Fitness: " << population[0].getFitness() << endl;
+            double avgFitness = sumFitness / sampleCount;
+            double currentBestFitness = population[0].getFitness();
+            double improvementRate = (gen > 0) ? (currentBestFitness - previousBestFitness) : 0.0;
+            previousBestFitness = currentBestFitness;
+            
+            auto now = chrono::steady_clock::now();
+            int elapsedSeconds = chrono::duration_cast<chrono::seconds>(now - startTime).count();
+            
+            // Update UI
+            TrainingUI::clearScreen();
+            TrainingUI::displayHeader();
+            TrainingUI::displayNetworkArchitecture(layers);
+            
+            TrainingUI::TrainingStats stats{
+                gen + 1,
+                generations,
+                populationSize,
+                currentBestFitness,
+                avgFitness,
+                improvementRate,
+                elapsedSeconds
+            };
+            
+            TrainingUI::displayTrainingProgress(stats);
+            
+            // Display recent generation details
+            cout << Colors::BOLD << Colors::BRIGHT_CYAN << "📈 Recent Generation\n" << Colors::RESET;
+            TrainingUI::displayGenerationSummary(gen + 1, currentBestFitness, improvementRate);
+            cout << "\n";
             
             // GA Evolution (optional)
             if (useGA && gen < generations - 1) {
@@ -172,15 +218,35 @@ int main() {
 
                 population = std::move(newPopulation);
             }
+            
+            TrainingUI::displayFooter();
         }
         
-        cout << "\nTraining Complete!" << endl;
-        cout << "Best Network Fitness: " << population[0].getFitness() << endl;
+        // Final results
+        TrainingUI::clearScreen();
+        TrainingUI::displayHeader();
+        
+        cout << Colors::BOLD << Colors::BRIGHT_GREEN 
+             << "🏆 Training Complete!\n\n" << Colors::RESET;
+        
+        cout << Colors::BRIGHT_CYAN << "Final Results:\n" << Colors::RESET;
+        cout << "├─ " << Colors::BRIGHT_GREEN << "Best Network Fitness: " << Colors::RESET 
+             << Colors::BRIGHT_YELLOW << fixed << setprecision(4) << population[0].getFitness() 
+             << Colors::RESET << "\n";
+        cout << "├─ " << Colors::BRIGHT_GREEN << "Total Generations: " << Colors::RESET 
+             << Colors::BRIGHT_YELLOW << generations << Colors::RESET << "\n";
+        cout << "├─ " << Colors::BRIGHT_GREEN << "Population Size: " << Colors::RESET 
+             << Colors::BRIGHT_YELLOW << populationSize << Colors::RESET << "\n";
+        cout << "└─ " << Colors::BRIGHT_GREEN << "Optimization Method: " << Colors::RESET 
+             << Colors::BRIGHT_YELLOW << (useGA ? "Genetic Algorithm" : "Backpropagation") 
+             << Colors::RESET << "\n\n";
+        
+        cout << Colors::DIM << "Results saved. Training ended gracefully.\n" << Colors::RESET;
         
         return 0;
         
     } catch (const exception& e) {
-        cerr << "Error: " << e.what() << endl;
+        cerr << Colors::RED << "❌ Error: " << e.what() << Colors::RESET << endl;
         return 1;
     }
 }

@@ -17,7 +17,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libx11-dev libgl1-mesa-dev
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libgl1-mesa-dev \
+            libx11-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libxrandr-dev
 
       - name: Configure with CMake
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

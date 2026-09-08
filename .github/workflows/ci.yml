@@ -17,19 +17,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libx11-dev
+          sudo apt-get install -y build-essential cmake libx11-dev libgl1-mesa-dev
 
       - name: Configure with CMake
-        run: |
-          mkdir -p build
-          cd build
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build OCR
-        run: |
-          cd build
-          cmake --build . --config Release -j$(nproc)
+        run: cmake --build build --config Release --parallel
 
       - name: Verify executable
         run: |
@@ -54,23 +48,14 @@ jobs:
       - name: Checkout OCR repo
         uses: actions/checkout@v4
 
-      - name: Setup CMake
-        uses: cmake-js/setup-cmake@v3
-        with:
-          cmake-version: '3.25.x'
-
       - name: Configure with CMake
-        run: |
-          mkdir -p build
-          cd build
-          cmake .. -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build OCR
-        run: |
-          cd build
-          cmake --build . --config Release -j 4
+        run: cmake --build build --config Release --parallel 4
 
       - name: Verify executable
+        shell: pwsh
         run: |
           Get-ChildItem build/Release/ocr_trainer.exe
           Write-Host "✅ Windows build successful!"
@@ -79,14 +64,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Verify project structure
         run: |
           test -f README.md && echo "✅ README.md exists"
           test -f CMakeLists.txt && echo "✅ CMakeLists.txt exists"
           test -f NeuralNetworkComputation/Source.cpp && echo "✅ Source.cpp exists"
           echo "✅ All required files present"
-          
+
       - name: Check for Visual Studio files
         run: |
           if [ -f "NeuralNetworkComputation.sln" ] || [ -d ".vs" ] || [ -d "x64" ]; then
